@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      
+      - name: Build binaries
+        run: make release
+      
+      - name: Create release archives
+        run: |
+          cd build
+          tar -czf multikey-darwin-amd64.tar.gz multikey-darwin-amd64
+          tar -czf multikey-darwin-arm64.tar.gz multikey-darwin-arm64
+          tar -czf multikey-linux-amd64.tar.gz multikey-linux-amd64
+          tar -czf multikey-linux-arm64.tar.gz multikey-linux-arm64
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build/*.tar.gz
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
