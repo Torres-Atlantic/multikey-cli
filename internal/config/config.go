@@ -44,7 +44,8 @@ type Config struct {
 
 // Meta contains metadata about the configuration
 type Meta struct {
-	Version int `json:"version"`
+	Version    int    `json:"version"`
+	LicenseKey string `json:"licenseKey,omitempty"`
 }
 
 // Manager handles configuration operations
