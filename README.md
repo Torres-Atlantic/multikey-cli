@@ -5,6 +5,7 @@ MultiKey CLI is an open source developer tool that manages multiple GitHub SSH i
 ## Features
 
 - **Multiple SSH Profile Management** - Create, edit, and delete SSH profiles for different GitHub accounts
+- **Passphrase-Protected Keys** - Optionally encrypt generated SSH keys with a passphrase (with macOS Keychain integration)
 - **Folder-to-Profile Mapping** - Automatically apply the correct profile based on folder location
 - **Repo-Level Mapping** - Override profile per repository
 - **Automatic Repo Scanning** - Find and analyze Git repositories
@@ -77,7 +78,7 @@ make build
 ### Repository Operations
 
 - `multikey scan <path>` - Scan for Git repositories and show alignment status
-- `multikey apply <path>` - Automatically fix repositories to match their profiles
+- `multikey apply <path>` - Automatically fix repositories to match their profiles (use `--dry-run` to preview changes without modifying anything)
 - `multikey assign <path> --profile <id>` - Assign a profile to a repository and apply fixes
 - `multikey status <path>` - Show repository status vs expected configuration
 - `multikey diagnose <path>` - Run full health check
