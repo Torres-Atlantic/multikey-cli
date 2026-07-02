@@ -27,11 +27,37 @@ by providing profile-based SSH routing tied to directory paths and repositories.
 	SilenceErrors: true,
 }
 
+// firstRunEligible reports whether the invoked command should be allowed to
+// trigger the first-run onboarding prompt. Commands that must work without any
+// configuration — version, help, and shell completion — are excluded so they
+// are never hijacked by the setup wizard.
+func firstRunEligible(args []string) bool {
+	// An explicit help request never onboards, even on a subcommand.
+	for _, a := range args {
+		if a == "-h" || a == "--help" {
+			return false
+		}
+	}
+
+	cmd, _, err := rootCmd.Find(args)
+	if err != nil || cmd == nil {
+		return false
+	}
+
+	switch cmd.Name() {
+	case "version", "help", "completion",
+		cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+		return false
+	}
+
+	return true
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() error {
-	// Check for first run
+	// Check for first run — but only for commands that actually need config.
 	configMgr, err := config.NewManager()
-	if err == nil && !configMgr.Exists() {
+	if err == nil && firstRunEligible(os.Args[1:]) && !configMgr.Exists() {
 		fmt.Println("Welcome to MultiKey CLI!")
 		fmt.Println()
 		fmt.Println("It looks like this is your first time running MultiKey CLI.")
