@@ -12,12 +12,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var applyDryRun bool
+
 var applyCmd = &cobra.Command{
 	Use:   "apply <path>",
 	Short: "Apply fixes to repositories",
 	Long:  "Scan repositories and automatically fix remote URLs and Git config to match their assigned profiles.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runApply,
+}
+
+func init() {
+	applyCmd.Flags().BoolVar(&applyDryRun, "dry-run", false, "Preview changes without modifying any repositories")
 }
 
 func runApply(cmd *cobra.Command, args []string) error {
@@ -78,10 +84,19 @@ func runApply(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Found %d repository(ies) that need fixing.\n\n", len(toFix))
 
+	if applyDryRun {
+		fmt.Println("Dry run — no changes will be made.")
+		fmt.Println()
+	}
+
 	// Apply fixes
 	var fixed, failed int
 	for _, repo := range toFix {
-		fmt.Printf("Fixing: %s\n", repo.Path)
+		if applyDryRun {
+			fmt.Printf("Would fix: %s\n", repo.Path)
+		} else {
+			fmt.Printf("Fixing: %s\n", repo.Path)
+		}
 
 		profile := repo.ExpectedProfile
 
@@ -90,18 +105,23 @@ func runApply(cmd *cobra.Command, args []string) error {
 			host, org, repoName, err := git.ParseRemoteURL(repo.CurrentRemote)
 			if err == nil && host != profile.SSHHost {
 				newURL := git.BuildRemoteURL(profile.SSHHost, org, repoName)
-				if err := git.SetRemoteURL(repo.Path, newURL); err != nil {
+				if applyDryRun {
+					fmt.Printf("  • Would update remote URL to %s\n", newURL)
+				} else if err := git.SetRemoteURL(repo.Path, newURL); err != nil {
 					fmt.Printf("  ⚠ Failed to update remote URL: %v\n", err)
 					failed++
 					continue
+				} else {
+					fmt.Printf("  ✓ Updated remote URL to %s\n", newURL)
 				}
-				fmt.Printf("  ✓ Updated remote URL to %s\n", newURL)
 			}
 		}
 
 		// Fix Git config
 		if repo.CurrentEmail != profile.Email {
-			if err := git.SetUserEmail(repo.Path, profile.Email); err != nil {
+			if applyDryRun {
+				fmt.Printf("  • Would update user.email to %s\n", profile.Email)
+			} else if err := git.SetUserEmail(repo.Path, profile.Email); err != nil {
 				fmt.Printf("  ⚠ Failed to update user.email: %v\n", err)
 			} else {
 				fmt.Printf("  ✓ Updated user.email to %s\n", profile.Email)
@@ -109,7 +129,9 @@ func runApply(cmd *cobra.Command, args []string) error {
 		}
 
 		if repo.CurrentName != profile.Username {
-			if err := git.SetUserName(repo.Path, profile.Username); err != nil {
+			if applyDryRun {
+				fmt.Printf("  • Would update user.name to %s\n", profile.Username)
+			} else if err := git.SetUserName(repo.Path, profile.Username); err != nil {
 				fmt.Printf("  ⚠ Failed to update user.name: %v\n", err)
 			} else {
 				fmt.Printf("  ✓ Updated user.name to %s\n", profile.Username)
@@ -127,13 +149,20 @@ func runApply(cmd *cobra.Command, args []string) error {
 		}
 
 		if !hasMapping {
-			if err := resolver.AddRepoMapping(repo.Path, profile.ID); err == nil {
+			if applyDryRun {
+				fmt.Printf("  • Would add repository mapping\n")
+			} else if err := resolver.AddRepoMapping(repo.Path, profile.ID); err == nil {
 				fmt.Printf("  ✓ Added repository mapping\n")
 			}
 		}
 
 		fixed++
 		fmt.Println()
+	}
+
+	if applyDryRun {
+		fmt.Printf("Dry run complete: %d repository(ies) would be fixed. Re-run without --dry-run to apply.\n", fixed)
+		return nil
 	}
 
 	// Save config

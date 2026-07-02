@@ -256,8 +256,13 @@ func createProfileInteractive(profileMgr *profile.Manager) error {
 			return err
 		}
 
+		passphrase, perr := promptPassphrase()
+		if perr != nil {
+			return perr
+		}
+
 		fmt.Printf("Generating SSH key at: %s\n", keyPath)
-		if err := ssh.GenerateKey(keyPath); err != nil {
+		if err := ssh.GenerateKey(keyPath, answers.Email, passphrase); err != nil {
 			return fmt.Errorf("failed to generate SSH key: %w", err)
 		}
 		fmt.Println("✓ SSH key generated")

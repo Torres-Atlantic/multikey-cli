@@ -114,8 +114,13 @@ func runProfileAdd(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
+		passphrase, err := promptPassphrase()
+		if err != nil {
+			return err
+		}
+
 		fmt.Printf("Generating SSH key at: %s\n", keyPath)
-		if err := ssh.GenerateKey(keyPath); err != nil {
+		if err := ssh.GenerateKey(keyPath, answers.Email, passphrase); err != nil {
 			return fmt.Errorf("failed to generate SSH key: %w", err)
 		}
 		fmt.Println("✓ SSH key generated")
@@ -319,5 +324,30 @@ func runProfileRemove(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("✓ Profile '%s' removed\n", profileID)
 	return nil
+}
+
+// promptPassphrase asks whether to encrypt a generated key and, if so, collects
+// the passphrase. An empty return value means the key should be unencrypted.
+func promptPassphrase() (string, error) {
+	var encrypt bool
+	if err := survey.AskOne(&survey.Confirm{
+		Message: "Encrypt the private key with a passphrase? (recommended)",
+		Default: true,
+	}, &encrypt); err != nil {
+		return "", err
+	}
+
+	if !encrypt {
+		return "", nil
+	}
+
+	var passphrase string
+	if err := survey.AskOne(&survey.Password{
+		Message: "Passphrase:",
+	}, &passphrase, survey.WithValidator(survey.Required)); err != nil {
+		return "", err
+	}
+
+	return passphrase, nil
 }
 

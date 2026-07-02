@@ -38,7 +38,13 @@ func SetRemoteURL(repoPath, url string) error {
 	return nil
 }
 
-// ParseRemoteURL parses a Git remote URL and extracts the host and path
+// ParseRemoteURL parses a Git remote URL and extracts the host and path.
+//
+// Scope: it supports only the GitHub-style shapes `git@host:org/repo(.git)` and
+// `https://host/org/repo(.git)`. The `git@` form requires exactly one org and one
+// repo segment; the `https` form takes the first two path segments. `ssh://` URLs
+// and any other scheme are rejected. This is intentional for MultiKey's
+// GitHub-only focus; broaden here if other hosts ever come into scope.
 func ParseRemoteURL(url string) (host, org, repo string, err error) {
 	// Handle git@host:org/repo.git format
 	if strings.HasPrefix(url, "git@") {

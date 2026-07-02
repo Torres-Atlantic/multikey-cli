@@ -1,10 +1,6 @@
 package ssh
 
 import (
-	"crypto/ed25519"
-	"crypto/rand"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,8 +8,11 @@ import (
 	"strings"
 )
 
-// GenerateKey generates a new ED25519 SSH key pair
-func GenerateKey(keyPath string) error {
+// GenerateKey generates a new ED25519 SSH key pair at keyPath using ssh-keygen.
+// If passphrase is non-empty the private key is encrypted with it; pass "" to
+// generate an unencrypted key. comment is embedded in the public key (typically
+// the profile email). The matching public key is written to keyPath + ".pub".
+func GenerateKey(keyPath, comment, passphrase string) error {
 	// Ensure directory exists
 	keyDir := filepath.Dir(keyPath)
 	if err := os.MkdirAll(keyDir, 0700); err != nil {
@@ -25,35 +24,30 @@ func GenerateKey(keyPath string) error {
 		return fmt.Errorf("key file already exists: %s", keyPath)
 	}
 
-	// Generate private key
-	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		return fmt.Errorf("failed to generate key: %w", err)
+	// Delegate to ssh-keygen so passphrase encryption and the .pub file are
+	// handled the same way the rest of the SSH toolchain expects.
+	args := []string{"-t", "ed25519", "-f", keyPath, "-N", passphrase}
+	if comment != "" {
+		args = append(args, "-C", comment)
 	}
-
-	// Marshal private key
-	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
-	if err != nil {
-		return fmt.Errorf("failed to marshal private key: %w", err)
-	}
-
-	// Encode private key to PEM
-	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "PRIVATE KEY",
-		Bytes: privateKeyBytes,
-	})
-
-	// Write private key
-	if err := os.WriteFile(keyPath, privateKeyPEM, 0600); err != nil {
-		return fmt.Errorf("failed to write private key: %w", err)
+	cmd := exec.Command("ssh-keygen", args...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to generate SSH key: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 
 	return nil
 }
 
-// GetPublicKey extracts the public key from a private key file
+// GetPublicKey returns the public key for a private key file, preferring the
+// persisted .pub file (which avoids a passphrase prompt for encrypted keys) and
+// falling back to deriving it from the private key.
 func GetPublicKey(privateKeyPath string) (string, error) {
-	// Use ssh-keygen to extract public key
+	// Prefer the persisted .pub file (present for keys we generated).
+	if data, err := os.ReadFile(privateKeyPath + ".pub"); err == nil {
+		return strings.TrimSpace(string(data)), nil
+	}
+
+	// Fall back to deriving the public key from the private key.
 	cmd := exec.Command("ssh-keygen", "-y", "-f", privateKeyPath)
 	output, err := cmd.Output()
 	if err != nil {
