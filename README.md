@@ -19,8 +19,11 @@ MultiKey CLI is an open source developer tool that manages multiple GitHub SSH i
 
 ```bash
 brew tap Torres-Atlantic/multikey
+brew trust Torres-Atlantic/multikey
 brew install multikey
 ```
+
+> **Note:** current Homebrew versions require `brew trust` before installing from a third-party tap. Run it once per machine.
 
 ### Using Go Install
 
